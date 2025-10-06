@@ -17,16 +17,14 @@ from langchain_core.output_parsers import StrOutputParser
 st.set_page_config(page_title="Quarterly Revenue Forecaster", layout="wide")
 st.title("📈 Quarterly Revenue Forecaster & AI Co-pilot")
 
-# --- Load Credentials (cached for performance) ---
 @st.cache_resource
 def load_credentials():
-    load_dotenv()
-    # Note: For Streamlit Cloud, you'll set these as Secrets, not in a .env file
+    # For Streamlit Cloud, credentials are read from st.secrets
     return {
-        "AZURE_OPENAI_ENDPOINT": os.getenv("AZURE_OPENAI_ENDPOINT"),
-        "AZURE_OPENAI_API_KEY": os.getenv("AZURE_OPENAI_API_KEY"),
-        "AZURE_SEARCH_ENDPOINT": os.getenv("AZURE_SEARCH_ENDPOINT"),
-        "AZURE_SEARCH_ADMIN_KEY": os.getenv("AZURE_SEARCH_ADMIN_KEY")
+        "AZURE_OPENAI_ENDPOINT": st.secrets["AZURE_OPENAI_ENDPOINT"],
+        "AZURE_OPENAI_API_KEY": st.secrets["AZURE_OPENAI_API_KEY"],
+        "AZURE_SEARCH_ENDPOINT": st.secrets["AZURE_SEARCH_ENDPOINT"],
+        "AZURE_SEARCH_ADMIN_KEY": st.secrets["AZURE_SEARCH_ADMIN_KEY"]
     }
 creds = load_credentials()
 
