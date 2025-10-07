@@ -9,7 +9,6 @@ from langchain_openai import AzureOpenAIEmbeddings
 from langchain_community.vectorstores import AzureSearch
 
 def build_search_index(ticker: str, pdf_path: str):
-    # ✅ --- Foolproof path to the .env file ---
     # This finds the directory the script is in, goes one level up to the project root,
     # and then finds the .env file there. This works no matter where you run it from.
     script_dir = os.path.dirname(__file__)

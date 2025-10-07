@@ -19,7 +19,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ✅ Improvement #2: New Modern Dark Theme
 st.markdown("""
 <style>
     /* Main background color */
@@ -98,26 +97,23 @@ selected_ticker = st.sidebar.selectbox("Choose a stock ticker:", ("AAPL", "MSFT"
 # --- 6. Forecasting Section ---
 st.header(f"Next Quarter Revenue Forecast for {selected_ticker}")
 
-if st.sidebar.button("Generate Forecast", type="primary"):
-    with st.spinner("Generating forecast features..."):
+if st.sidebar.button("Forecast Revenue", type="primary"):
+    with st.spinner("Generating forecast..."):
         X_future = forecast_features_df[forecast_features_df['ticker'] == selected_ticker].copy()
         X_future['quarter'] = pd.Categorical(X_future['quarter'], categories=[1, 2, 3, 4], ordered=True)
         X_future = X_future[MODEL_COLUMNS]
-    
-    with st.spinner("Generating forecast..."):
+        
         median = model_median.predict(X_future)[0]
 
         col1, col2 = st.columns([1, 2])
-
         with col1:
-            # ✅ Improvement #2: Simplified metric display
+            
             st.metric(label="Predicted Revenue", value=f"${median/1e9:.2f} B")
             
             with st.expander("View Key Forecast Drivers"):
                 st.write("Top 5 most influential factors for this forecast:")
                 for feature, friendly_name in SHAP_FEATURE_MAP.items():
                     st.markdown(f"- **{friendly_name}**")
-
         with col2:
             history = historical_df[historical_df['ticker'] == selected_ticker].copy()
             last_historical_point = history.iloc[-1:]
@@ -131,12 +127,19 @@ if st.sidebar.button("Generate Forecast", type="primary"):
             fig_history.update_layout(title=f"Historical vs. Forecasted Revenue", xaxis_title="Quarter", yaxis_title="Revenue (USD)", template="plotly_dark", showlegend=False)
             st.plotly_chart(fig_history, use_container_width=True)
 
+st.sidebar.divider()
+st.sidebar.subheader("About the Author")
+st.sidebar.markdown("""
+This app was created by **Sina Movahedi Aliabadi**.
+- [LinkedIn](https://www.linkedin.com/in/your-linkedin-profile/)
+- [GitHub Repository](https://github.com/sinamov/Q-revenue-forecasting-app)
+""")
+
 st.divider()
 
-# --- 7. AI Copilot Section (Corrected Layout) ---
-st.header(f"Ask AI Copilot about {selected_ticker}'s 10-K Report")
+# --- AI Co-pilot Section ---
+st.header(f"Ask AI Co-pilot about {selected_ticker}'s 10-K Report")
 
-# ✅ FIX: Initialize a dictionary for messages in session_state if it doesn't exist
 if "messages" not in st.session_state:
     st.session_state.messages = {}
 
@@ -147,7 +150,6 @@ if selected_ticker in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# ✅ FIX: Handle example questions and user input at the bottom
 # This ensures new messages appear after the history
 def handle_chat_input(question, ticker):
     """Adds user message to history, gets a response, and adds it to history."""
