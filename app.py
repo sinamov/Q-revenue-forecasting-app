@@ -13,6 +13,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
+MODEL_COLUMNS = ['revenues_lag_1', 'revenues_lag_2', 'revenues_lag_3', 'revenues_lag_4', 'revenues_rolling_avg_4', 'net_income_lag_2', 'net_income_lag_3', 'net_income_lag_4', 'net_income_rolling_avg_4', 'research_and_development_expense_lag_4', 'research_and_development_expense_lag_5', 'research_and_development_expense_lag_6', 'research_and_development_expense_lag_7', 'research_and_development_expense_lag_8', 'selling_general_and_administrative_expense_lag_1', 'selling_general_and_administrative_expense_lag_2', 'selling_general_and_administrative_expense_rolling_avg_4', 'assets_lag_2', 'assets_lag_3', 'assets_lag_4', 'liabilities_lag_2', 'liabilities_lag_3', 'liabilities_lag_4', 'shareholder_equity_lag_2', 'shareholder_equity_lag_3', 'shareholder_equity_lag_4', 'gdp_lag_1', 'gdp_lag_2', 'cpi_lag_1', 'unemployment_lag_1', 'unemployment_lag_2', 'year', 'quarter']
+
 # --- Page Configuration ---
 st.set_page_config(page_title="Quarterly Revenue Forecaster", layout="wide")
 st.title("📈 Quarterly Revenue Forecaster & AI Co-pilot")
@@ -78,6 +80,8 @@ if st.sidebar.button("Generate Forecast"):
         # Prepare the feature DataFrame
         X_future = pd.DataFrame.from_dict(future_features_data[selected_ticker])
         X_future['quarter'] = pd.Categorical(X_future['quarter'], categories=[1, 2, 3, 4], ordered=True)
+        
+        X_future = X_future[MODEL_COLUMNS]
         
         # Make predictions
         lower = model_lower.predict(X_future)[0]
