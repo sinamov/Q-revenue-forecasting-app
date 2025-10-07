@@ -91,7 +91,7 @@ SHAP_FEATURE_MAP = {
 }
 
 # --- 5. UI Layout ---
-st.title("📈 Quarterly Revenue Forecaster & AI Co-pilot")
+st.title("📈 Quarterly Revenue Forecaster & AI Copilot")
 st.sidebar.header("Select Company")
 selected_ticker = st.sidebar.selectbox("Choose a stock ticker:", ("AAPL", "MSFT", "GOOGL"))
 
@@ -133,14 +133,32 @@ if st.sidebar.button("Generate Forecast", type="primary"):
 
 st.divider()
 
-# --- 7. AI Co-pilot Section ---
-st.header(f"Ask AI Co-pilot about {selected_ticker}'s 10-K Report")
+# --- 7. AI Copilot Section (Corrected Layout) ---
+st.header(f"Ask AI Copilot about {selected_ticker}'s 10-K Report")
 
-# ✅ Improvement #3: Robust session state initialization for chat history
+# ✅ FIX: Initialize a dictionary for messages in session_state if it doesn't exist
 if "messages" not in st.session_state:
-    st.session_state.messages = {} # Use a dictionary to store history per ticker
+    st.session_state.messages = {}
 
-def run_rag_chain(question, ticker):
+# Display chat messages for the selected ticker from history on app rerun
+# This loop now runs at the top to display the history first.
+if selected_ticker in st.session_state.messages:
+    for message in st.session_state.messages[selected_ticker]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# ✅ FIX: Handle example questions and user input at the bottom
+# This ensures new messages appear after the history
+def handle_chat_input(question, ticker):
+    """Adds user message to history, gets a response, and adds it to history."""
+    # Add user message to session state
+    st.session_state.messages.setdefault(ticker, []).append({"role": "user", "content": question})
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    # Get and display assistant response
     with st.chat_message("assistant"):
         with st.spinner("Analyzing document..."):
             try:
@@ -150,29 +168,26 @@ def run_rag_chain(question, ticker):
                 rag_chain = ({"context": retriever, "question": RunnablePassthrough()} | prompt | llm | StrOutputParser())
                 response = rag_chain.invoke(question)
                 st.markdown(response)
-                # Append to the correct ticker's history
-                st.session_state.messages.setdefault(ticker, []).append({"role": "assistant", "content": response})
+                # Add assistant response to session state
+                st.session_state.messages[ticker].append({"role": "assistant", "content": response})
             except Exception as e:
-                st.error(f"Could not retrieve answer. Please ensure the index for {ticker} has been built. Error: {e}")
+                error_message = f"Could not retrieve answer. Please ensure the index for {ticker} has been built. Error: {e}"
+                st.error(error_message)
+                st.session_state.messages[ticker].append({"role": "assistant", "content": error_message})
 
-# ✅ Improvement #3: Example questions
+# Example Questions Section
+st.markdown("---")
+st.write("Or try one of these example questions:")
 example_questions = ["What are the main business risks?", "Summarize Management's Discussion.", "Are there any ongoing legal proceedings?"]
+
 cols = st.columns(len(example_questions))
 for i, question in enumerate(example_questions):
-    if cols[i].button(question, use_container_width=True, key=f"example_{i}"):
-        # On button click, add user message and run the chain
-        st.session_state.messages.setdefault(selected_ticker, []).append({"role": "user", "content": question})
-        run_rag_chain(question, selected_ticker)
+    if cols[i].button(question, use_container_width=True, key=f"example_{i}_{selected_ticker}"):
+        # When a button is clicked, it calls the same handler as the chat input
+        handle_chat_input(question, selected_ticker)
+        # Rerun to clear the button state and show the new messages in the main history
+        st.rerun()
 
-# Display chat history for the currently selected ticker
-if selected_ticker in st.session_state.messages:
-    for message in st.session_state.messages[selected_ticker]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-# Main chat input
+# Main chat input is the last element
 if prompt_input := st.chat_input("Ask your own question..."):
-    st.session_state.messages.setdefault(selected_ticker, []).append({"role": "user", "content": prompt_input})
-    with st.chat_message("user"):
-        st.markdown(prompt_input)
-    run_rag_chain(prompt_input, selected_ticker)
+    handle_chat_input(prompt_input, selected_ticker)
