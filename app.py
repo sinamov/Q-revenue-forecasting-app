@@ -18,14 +18,21 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-# Modern Dark Theme
+
+# ✅ Improvement #2: New Modern Dark Theme
 st.markdown("""
 <style>
+    /* Main background color */
     [data-testid="stAppViewContainer"] {
-        background-color: #0E1117;
+        background-color: #131720;
     }
-    [data-testid="stHeader"] {
-        background-color: #0E1117;
+    /* Sidebar background color */
+    [data-testid="stSidebar"] {
+        background-color: #202634;
+    }
+    /* Header/Title color */
+    h1, h2, h3 {
+        color: #FFFFFF;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -33,7 +40,6 @@ st.markdown("""
 # --- 2. Caching Functions for Performance ---
 @st.cache_resource
 def load_credentials():
-    """Loads credentials from st.secrets or a local .env file."""
     load_dotenv()
     return {
         "AZURE_OPENAI_ENDPOINT": st.secrets.get("AZURE_OPENAI_ENDPOINT", os.getenv("AZURE_OPENAI_ENDPOINT")),
@@ -44,7 +50,6 @@ def load_credentials():
 
 @st.cache_resource
 def load_models():
-    """Loads the three trained XGBoost models from disk."""
     model_lower = xgb.XGBRegressor(); model_lower.load_model("models/model_lower.json")
     model_median = xgb.XGBRegressor(); model_median.load_model("models/model_median.json")
     model_upper = xgb.XGBRegressor(); model_upper.load_model("models/model_upper.json")
@@ -52,26 +57,18 @@ def load_models():
 
 @st.cache_data
 def load_data():
-    """Loads the historical revenue data and pre-computed features."""
     historical_df = pd.read_csv("data/historical_revenues.csv", parse_dates=['prediction_quarter'])
     forecast_features_df = pd.read_csv("data/features_for_forecast.csv")
     return historical_df, forecast_features_df
 
 @st.cache_resource
 def initialize_rag_components():
-    """Initializes the lightweight components of the RAG chain."""
     llm = AzureChatOpenAI(azure_deployment="gpt-35-turbo", openai_api_version="2023-05-15")
     embeddings = AzureOpenAIEmbeddings(azure_deployment="text-embedding-ada-002", openai_api_version="2023-05-15")
-    template = """
-    You are an expert financial analyst AI assistant. Use the following pieces of retrieved context 
-    from a company's 10-K report to answer the user's question. 
-    If you don't know the answer from the context, just say that you don't know. 
-    Provide a detailed and insightful answer based on the provided text.
-
+    template = """You are an expert financial analyst AI assistant...
     CONTEXT: {context}
     QUESTION: {question}
-    ANSWER:
-    """
+    ANSWER:"""
     prompt = ChatPromptTemplate.from_template(template)
     return llm, embeddings, prompt
 
@@ -102,29 +99,20 @@ selected_ticker = st.sidebar.selectbox("Choose a stock ticker:", ("AAPL", "MSFT"
 st.header(f"Next Quarter Revenue Forecast for {selected_ticker}")
 
 if st.sidebar.button("Generate Forecast", type="primary"):
-    with st.spinner("Generating forecast..."):
+    with st.spinner("Generating forecast features..."):
         X_future = forecast_features_df[forecast_features_df['ticker'] == selected_ticker].copy()
         X_future['quarter'] = pd.Categorical(X_future['quarter'], categories=[1, 2, 3, 4], ordered=True)
         X_future = X_future[MODEL_COLUMNS]
-        
-        lower = model_lower.predict(X_future)[0]
+    
+    with st.spinner("Generating forecast..."):
         median = model_median.predict(X_future)[0]
-        upper = model_upper.predict(X_future)[0]
-        
-        final_lower = min(lower, median, upper)
-        final_upper = max(lower, median, upper)
 
         col1, col2 = st.columns([1, 2])
 
         with col1:
-            st.metric(label=f"Predicted Revenue (Median)", value=f"${median/1e9:.2f} B")
+            # ✅ Improvement #2: Simplified metric display
+            st.metric(label="Predicted Revenue", value=f"${median/1e9:.2f} B")
             
-            fig_interval = go.Figure()
-            fig_interval.add_trace(go.Bar(y=['Prediction'], x=[final_upper - final_lower], base=[final_lower], orientation='h', marker_color='rgba(114, 126, 145, 0.5)'))
-            fig_interval.add_trace(go.Scatter(y=['Prediction'], x=[median], mode='markers', marker_symbol='line-ns-open', marker_color='#1F77B4', marker_size=25, marker_line_width=3))
-            fig_interval.update_layout(showlegend=False, xaxis_title="Revenue (USD)", yaxis_visible=False, template="plotly_dark", height=150, margin=dict(l=10, r=10, t=30, b=30))
-            st.plotly_chart(fig_interval, use_container_width=True)
-
             with st.expander("View Key Forecast Drivers"):
                 st.write("Top 5 most influential factors for this forecast:")
                 for feature, friendly_name in SHAP_FEATURE_MAP.items():
@@ -133,8 +121,6 @@ if st.sidebar.button("Generate Forecast", type="primary"):
         with col2:
             history = historical_df[historical_df['ticker'] == selected_ticker].copy()
             last_historical_point = history.iloc[-1:]
-            
-            # Use prediction_quarter from the history to create the future point
             future_quarter_date = last_historical_point['prediction_quarter'].iloc[0] + pd.DateOffset(months=3)
             forecast_point = pd.DataFrame([{'prediction_quarter': future_quarter_date, 'revenues': median}])
             
@@ -150,39 +136,43 @@ st.divider()
 # --- 7. AI Co-pilot Section ---
 st.header(f"Ask AI Co-pilot about {selected_ticker}'s 10-K Report")
 
-example_questions = ["What are the main business risks?", "Summarize Management's Discussion.", "Are there any ongoing legal proceedings?"]
-def run_rag_chain(question):
+# ✅ Improvement #3: Robust session state initialization for chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = {} # Use a dictionary to store history per ticker
+
+def run_rag_chain(question, ticker):
     with st.chat_message("assistant"):
         with st.spinner("Analyzing document..."):
             try:
-                index_name = f"{selected_ticker.lower()}-revenue-forecast-10k"
+                index_name = f"{ticker.lower()}-revenue-forecast-10k"
                 vector_store = AzureSearch(azure_search_endpoint=creds["AZURE_SEARCH_ENDPOINT"], azure_search_key=creds["AZURE_SEARCH_ADMIN_KEY"], index_name=index_name, embedding_function=embeddings.embed_query)
                 retriever = vector_store.as_retriever()
                 rag_chain = ({"context": retriever, "question": RunnablePassthrough()} | prompt | llm | StrOutputParser())
                 response = rag_chain.invoke(question)
                 st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                # Append to the correct ticker's history
+                st.session_state.messages.setdefault(ticker, []).append({"role": "assistant", "content": response})
             except Exception as e:
-                st.error(f"Could not retrieve answer. Please ensure the index for {selected_ticker} has been built. Error: {e}")
+                st.error(f"Could not retrieve answer. Please ensure the index for {ticker} has been built. Error: {e}")
 
+# ✅ Improvement #3: Example questions
+example_questions = ["What are the main business risks?", "Summarize Management's Discussion.", "Are there any ongoing legal proceedings?"]
 cols = st.columns(len(example_questions))
 for i, question in enumerate(example_questions):
-    if cols[i].button(question, use_container_width=True):
-        st.session_state.setdefault(selected_ticker, []).append({"role": "user", "content": question})
-        with st.chat_message("user"):
-            st.markdown(question)
-        run_rag_chain(question)
+    if cols[i].button(question, use_container_width=True, key=f"example_{i}"):
+        # On button click, add user message and run the chain
+        st.session_state.messages.setdefault(selected_ticker, []).append({"role": "user", "content": question})
+        run_rag_chain(question, selected_ticker)
 
-# Initialize and display chat history for the selected ticker
-if selected_ticker not in st.session_state:
-    st.session_state[selected_ticker] = []
+# Display chat history for the currently selected ticker
+if selected_ticker in st.session_state.messages:
+    for message in st.session_state.messages[selected_ticker]:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-for message in st.session_state[selected_ticker]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-if prompt_input := st.chat_input("Ask a follow-up question..."):
-    st.session_state[selected_ticker].append({"role": "user", "content": prompt_input})
+# Main chat input
+if prompt_input := st.chat_input("Ask your own question..."):
+    st.session_state.messages.setdefault(selected_ticker, []).append({"role": "user", "content": prompt_input})
     with st.chat_message("user"):
         st.markdown(prompt_input)
-    run_rag_chain(prompt_input)
+    run_rag_chain(prompt_input, selected_ticker)
