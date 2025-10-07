@@ -131,7 +131,7 @@ st.sidebar.divider()
 st.sidebar.subheader("About the Author")
 st.sidebar.markdown("""
 This app was created by **Sina Movahedi Aliabadi**.
-- [LinkedIn](https://www.linkedin.com/in/your-linkedin-profile/)
+- [LinkedIn](https://www.linkedin.com/in/sina-movahedi-aliabadi/)
 - [GitHub Repository](https://github.com/sinamov/Q-revenue-forecasting-app)
 """)
 
