@@ -428,6 +428,27 @@
     },
     {
       "cell_type": "code",
+      "source": [
+        "X_future.to_csv(\"../data/features_for_forecast.csv\")\n",
+        "\n",
+        "print(\"Data files for the Streamlit app have been exported to the 'data' folder.\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": "Data files for the Streamlit app have been exported to the 'data' folder.\n"
+        }
+      ],
+      "execution_count": 12,
+      "metadata": {
+        "gather": {
+          "logged": 1759808785653
+        }
+      }
+    },
+    {
+      "cell_type": "code",
       "source": [],
       "outputs": [],
       "execution_count": null,
